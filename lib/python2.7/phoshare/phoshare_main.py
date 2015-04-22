@@ -17,7 +17,7 @@
 
 import getpass
 import logging
-import os
+#import os
 import re
 import sys
 import time
@@ -27,6 +27,7 @@ from optparse import OptionParser
 import MacOS
 
 import appledata.iphotodata as iphotodata
+import drive.drive as GDrive
 import tilutil.exiftool as exiftool
 import tilutil.systemutils as su
 import tilutil.imageutils as imageutils
@@ -50,6 +51,77 @@ _EXIF_EXTENSIONS = ('3fr', 'arw', 'ciff', 'cr2', 'crw', 'dcr', 'erf', 'jpg', 'jp
 # create logger
 _logger = logging.getLogger('google')
 _logger.setLevel(logging.DEBUG)
+
+# File operations intercepts
+def join(*arg):
+    import os.path
+    return os.path.join(*arg)
+
+def exists(path, options):
+    import os.path
+    if options.drive:
+        if path == '/':
+            return True
+        _logger.debug(u'exists "%s".', path)
+        return GDrive.api.exists(path)
+    else:
+        return os.path.exists(path)
+
+def isdir(s):
+    import os.path
+    return os.path.isdir(s)
+
+def listdir(path, options):
+    import os
+    if options.drive:
+        _logger.debug(u'listdir "%s".', path)
+        return GDrive.api.listdir(path)
+    else:
+        return os.listdir(path)
+
+def rmdir(path):
+    raise "Not ready yet"
+    import os
+    return os.rmdir(path)
+
+def remove(path):
+    raise "Not ready yet"
+    import os
+    return os.remove(path)
+
+def stat(path):
+    raise "Not ready yet"
+    import os
+    return os.stat(path)
+
+def getmtime(filename):
+    raise "Not ready yet"
+    import os.path
+    return os.path.getmtime(filename)
+
+def getsize(filename):
+    raise "Not ready yet"
+    import os.path
+    return os.path.getsize(filename)
+
+def split(p):
+    raise "Not ready yet"
+    import os.path
+    return os.path.split(p)
+
+def mkdir(path, mode=0777):
+    raise "Not ready yet"
+    import os
+    return os.mkdir(path, mode=mode)
+
+def makedirs(path, options, mode=0777):
+    import os
+    if options.drive:
+        return GDrive.api.makedirs(path)
+    else:
+        return os.makedirs(path, mode=mode)
+
+# END File operations intercepts
   
 def region_matches(region1, region2):
     """Tests if two regions (rectangles) match."""
@@ -76,14 +148,14 @@ def delete_album_file(album_file, albumdirectory, msg, options):
         return True
 
     try:
-        if os.path.isdir(album_file):
-            file_list = os.listdir(album_file)
+        if isdir(album_file):
+            file_list = listdir(album_file, options)
             for subfile in file_list:
-                delete_album_file(os.path.join(album_file, subfile),
+                delete_album_file(join(album_file, subfile),
                                   albumdirectory, msg, options)
-            os.rmdir(album_file)
+            rmdir(album_file)
         else:
-            os.remove(album_file)
+            remove(album_file)
         return True
     except OSError, ex:
         print >> sys.stderr, "Could not delete %s: %s" % (su.fsenc(album_file),
@@ -104,18 +176,18 @@ class ExportFile(object):
         else:
             self.size = None
             extension = su.getfileextension(photo.image_path)
-        self.export_file = os.path.join(
+        self.export_file = join(
             export_directory, base_name + '.' + extension)
         # Location of "Original" file, if any.
         originals_folder = u"Originals"
         if options.picasa:
-            if (os.path.exists(os.path.join(export_directory,
-                                            u".picasaoriginals")) or
-                not os.path.exists(os.path.join(export_directory,
-                                                u"Originals"))):
+            if (exists(join(export_directory,
+                                            u".picasaoriginals"), options) or
+                not exists(join(export_directory,
+                                                u"Originals"), options)):
                 originals_folder = u".picasaoriginals"
         if photo.originalpath:
-            self.original_export_file = os.path.join(
+            self.original_export_file = join(
                 export_directory, originals_folder, base_name + "." +
                 su.getfileextension(photo.originalpath))
         else:
@@ -132,32 +204,32 @@ class ExportFile(object):
           source_file: path to image file, with aliases resolved.
           options: processing options.
         """
-        if not os.path.exists(self.export_file):
+        if not exists(self.export_file, options):
             return True
         # In link mode, check the inode.
         if options.link:
-            export_stat = os.stat(self.export_file)
-            source_stat = os.stat(source_file)
+            export_stat = stat(self.export_file)
+            source_stat = stat(source_file)
             if export_stat.st_ino != source_stat.st_ino:
                 su.pout('Changed:  %s: inodes don\'t match: %d vs. %d' %
                     (self.export_file, export_stat.st_ino, source_stat.st_ino))
                 return True
         if (not options.reverse
-            and os.path.getmtime(self.export_file) + _MTIME_FUDGE <
-            os.path.getmtime(source_file)):
+            and getmtime(self.export_file) + _MTIME_FUDGE <
+            getmtime(source_file)):
             su.pout('Changed:  %s: newer version is available: %s vs. %s' %
                     (self.export_file,
-                     time.ctime(os.path.getmtime(self.export_file)),
-                     time.ctime(os.path.getmtime(source_file))))
+                     time.ctime(getmtime(self.export_file)),
+                     time.ctime(getmtime(source_file))))
             return True
 
         if (options.reverse
-            and os.path.getmtime(source_file) + _MTIME_FUDGE <
-            os.path.getmtime(self.export_file)):
+            and getmtime(source_file) + _MTIME_FUDGE <
+            getmtime(self.export_file)):
             su.pout('Changed:  %s: newer version is available: %s vs. %s' %
                     (self.export_file,
-                     time.ctime(os.path.getmtime(source_file)),
-                     time.ctime(os.path.getmtime(self.export_file))))
+                     time.ctime(getmtime(source_file)),
+                     time.ctime(getmtime(self.export_file))))
             return True
         
         if not self.size and not options.reverse:
@@ -165,8 +237,8 @@ class ExportFile(object):
             # stale files if titles get swapped between images. Double
             # check the size, allowing for some difference for meta data
             # changes made in the exported copy
-            source_size = os.path.getsize(source_file)
-            export_size = os.path.getsize(self.export_file)
+            source_size = getsize(source_file)
+            export_size = getsize(self.export_file)
             diff = abs(source_size - export_size)
             if diff > _MAX_FILE_DIFF or (diff > 32 and options.link):
                 su.pout('Changed:  %s: file size: %d vs. %d' %
@@ -188,11 +260,11 @@ class ExportFile(object):
         # In link mode, we don't need to check the modification date in the
         # database because we catch the changes by the size check above.
         #if (not options.link and
-        #    datetime.datetime.fromtimestamp(os.path.getmtime(
+        #    datetime.datetime.fromtimestamp(getmtime(
         #       self.export_file)) < self.photo.mod_date):
         #    su.pout('Changed:  %s: modified in iPhoto: %s vs. %s ' % (
         #        self.export_file,
-        #        time.ctime(os.path.getmtime(self.export_file)),
+        #        time.ctime(getmtime(self.export_file)),
         #        self.photo.mod_date))
         #    return True
         return False
@@ -200,32 +272,32 @@ class ExportFile(object):
     def _generate_original(self, options):
         """Exports the original file."""
         do_original_export = False
-        export_dir = os.path.split(self.original_export_file)[0]
-        if not os.path.exists(export_dir):
+        export_dir = split(self.original_export_file)[0]
+        if not exists(export_dir, options):
             su.pout("Creating folder " + export_dir)
             if not options.dryrun:
-                os.mkdir(export_dir)
+                mkdir(export_dir)
         original_source_file = su.resolve_alias(self.photo.originalpath)
-        if os.path.exists(self.original_export_file):
+        if exists(self.original_export_file, options):
             # In link mode, check the inode.
             if options.link:
-                export_stat = os.stat(self.original_export_file)
-                source_stat = os.stat(original_source_file)
+                export_stat = stat(self.original_export_file)
+                source_stat = stat(original_source_file)
                 if export_stat.st_ino != source_stat.st_ino:
                     su.pout('Changed:  %s: inodes don\'t match: %d vs. %d' %
                             (self.original_export_file, export_stat.st_ino, source_stat.st_ino))
                     do_original_export = True
-            if (os.path.getmtime(self.original_export_file) + _MTIME_FUDGE <
-                os.path.getmtime(original_source_file)):
+            if (getmtime(self.original_export_file) + _MTIME_FUDGE <
+                getmtime(original_source_file)):
                 su.pout('Changed:  %s: newer version is available: %s vs. %s' %
                         (self.original_export_file,
-                         time.ctime(os.path.getmtime(
+                         time.ctime(getmtime(
                              self.original_export_file)),
-                         time.ctime(os.path.getmtime(original_source_file))))
+                         time.ctime(getmtime(original_source_file))))
                 do_original_export = True
             elif not self.size:
-                source_size = os.path.getsize(original_source_file)
-                export_size = os.path.getsize(self.original_export_file)
+                source_size = getsize(original_source_file)
+                export_size = getsize(self.original_export_file)
                 diff = abs(source_size - export_size)
                 if diff > _MAX_FILE_DIFF or (diff > 0 and options.link):
                     su.pout(u'Changed:  %s: file size: %d vs. %d' %
@@ -478,13 +550,13 @@ class ExportDirectory(object):
 
     def load_album(self, options):
         """walks the album directory tree, and scans it for existing files."""
-        if not os.path.exists(self.albumdirectory):
+        if not exists(self.albumdirectory, options):
             su.pout("Creating folder " + self.albumdirectory)
             if not options.dryrun:
-                os.makedirs(self.albumdirectory)
-            else:
+                makedirs(self.albumdirectory, options)
+            else: 
                 return
-        file_list = os.listdir(self.albumdirectory)
+        file_list = listdir(self.albumdirectory, options)
         if file_list is None:
             return
 
@@ -494,9 +566,9 @@ class ExportDirectory(object):
                 continue
 
             album_file = unicodedata.normalize("NFC",
-                                               os.path.join(self.albumdirectory,
+                                               join(self.albumdirectory,
                                                             f))
-            if os.path.isdir(album_file):
+            if isdir(album_file):
                 if (options.originals and
                     (f == "Originals" or (options.picasa and
                                           f == ".picasaoriginals"))):
@@ -518,7 +590,7 @@ class ExportDirectory(object):
 
     def scan_originals(self, folder, options):
         """Scan a folder of Original images, and delete obsolete ones."""
-        file_list = os.listdir(folder)
+        file_list = listdir(folder)
         if not file_list:
             return
 
@@ -527,8 +599,8 @@ class ExportDirectory(object):
             if imageutils.is_ignore(f):
                 continue
 
-            originalfile = unicodedata.normalize("NFC", os.path.join(folder, f))
-            if os.path.isdir(originalfile):
+            originalfile = unicodedata.normalize("NFC", join(folder, f))
+            if isdir(originalfile):
                 delete_album_file(originalfile, self.albumdirectory,
                                   "Obsolete export Originals directory",
                                   options)
@@ -547,8 +619,8 @@ class ExportDirectory(object):
 
     def generate_files(self, options):
         """Generates the files in the export location."""
-        if not os.path.exists(self.albumdirectory) and not options.dryrun:
-            os.makedirs(self.albumdirectory)
+        if not exists(self.albumdirectory, options) and not options.dryrun:
+            makedirs(self.albumdirectory, options)
         for f in sorted(self.files):
             self.files[f].generate(options)
 
@@ -678,7 +750,7 @@ class ExportLibrary(object):
             # now the album itself
             picture_directory = ExportDirectory(
                 sub_name, sub_album,
-                os.path.join(self.albumdirectory, sub_name))
+                join(self.albumdirectory, sub_name))
             if picture_directory.add_iphoto_images(sub_album.images,
                                                    options) > 0:
                 self.named_folders[sub_name] = picture_directory
@@ -687,8 +759,8 @@ class ExportLibrary(object):
 
     def load_album(self, options):
         """Loads an existing album (export folder)."""
-        if not os.path.exists(self.albumdirectory) and not options.dryrun:
-            os.makedirs(self.albumdirectory)
+        if not exists(self.albumdirectory, options) and not options.dryrun:
+            makedirs(self.albumdirectory, options)
 
         album_directories = {}
         for folder in sorted(self.named_folders.values()):
@@ -705,20 +777,20 @@ class ExportLibrary(object):
         """Checks an export directory for obsolete files."""
         if options.ignore:
             exclude_pattern = re.compile(su.fsdec(options.ignore))
-            if exclude_pattern.match(os.path.split(directory)[1]):
+            if exclude_pattern.match(split(directory)[1]):
                 return True
-        if not os.path.exists(directory):
+        if not exists(directory, options):
             return True
         contains_albums = False
         for f in su.os_listdir_unicode(directory):
             if self._check_abort():
                 return
-            album_file = os.path.join(directory, f)
-            if os.path.isdir(album_file):
+            album_file = join(directory, f)
+            if isdir(album_file):
                 if f == "iPod Photo Cache":
                     su.pout("Skipping " + album_file)
                     continue
-                rel_path_file = os.path.join(rel_path, f)
+                rel_path_file = join(rel_path, f)
                 if album_file in album_directories:
                     contains_albums = True
                 elif not self.check_directories(album_file, rel_path_file,
@@ -738,8 +810,8 @@ class ExportLibrary(object):
 
     def generate_files(self, options):
         """Walks through the export tree and sync the files."""
-        if not os.path.exists(self.albumdirectory) and not options.dryrun:
-            os.makedirs(self.albumdirectory)
+        if not exists(self.albumdirectory, options) and not options.dryrun:
+            makedirs(self.albumdirectory, options)
         for ndir in sorted(self.named_folders):
             if self._check_abort():
                 break
@@ -802,6 +874,9 @@ def get_option_parser():
     p.add_option(
         "-d", "--delete", action="store_true",
         help="Delete obsolete files that are no longer in your iPhoto library.")
+    p.add_option(
+        "--drive", action="store_true",
+        help="Store the iPhoto library on Google Drive.")
     p.add_option(
         "--dryrun", action="store_true",
         help="""Show what would have been done, but don't change or copy any
@@ -972,7 +1047,10 @@ def run_phoshare(cmd_args):
     if options.checkalbumsize:
         data.checkalbumsizes(int(options.checkalbumsize))
 
-    if options.export:
+    if options.drive:
+        album = ExportLibrary('/')
+        export_iphoto(album, data, options.exclude, options)
+    elif options.export:
         album = ExportLibrary(su.expand_home_folder(options.export))
         export_iphoto(album, data, options.exclude, options)
     if options.picasaweb:
