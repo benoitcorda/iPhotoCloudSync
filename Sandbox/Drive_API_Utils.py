@@ -347,5 +347,5 @@ if __name__ == "__main__":
     #file = drive.insert("../allo.png")
     #drive.delete(file['id'])
     #drive.uploadImage("file.png",folder="album1/event1")
-
+    #deletete all: [drive.delete(i['id']) for i in drive.ls('*')]
 
