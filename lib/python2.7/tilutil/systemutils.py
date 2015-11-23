@@ -18,6 +18,7 @@ Created on May 29, 2009
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
+import drive.drive as GDrive
 import filecmp
 import logging
 import os
@@ -27,6 +28,15 @@ import unicodedata
 import MacOS
 
 from Carbon.File import FSResolveAliasFile
+
+
+def listdir(path):
+    import os
+    if path.startswith('gdrive/'):
+        _logger.debug(u'listdir "%s".', path)
+        return GDrive.api.listdir(path)
+    else:
+        return os.listdir(path)
 
 _sysenc = sys.getfilesystemencoding()
 
@@ -46,7 +56,7 @@ def resolve_alias(path):
     except (OSError, MacOS.Error) as ose:
         pout(u"Failed to resolve alias for %s." % (path))
         return path
-        
+
 def execandcombine(command):
     """execute a shell command, and return all output in a single string."""
     data = execandcapture(command)
@@ -75,7 +85,7 @@ def execandcapture(command):
 
 def equalscontent(string1, string2):
     """Tests if two strings are equal.
-    
+
     None is treated like an empty string. Trailing and leading whitespace is
     ignored."""
     if not string1:
@@ -102,12 +112,12 @@ def unicode_string(value):
 # FileUtil --------------------------------------------------------------------
 
 def os_listdir_unicode(folder):
-    """Returns os.listdir with proper Unicode handling, and sorted"""
+    """Returns listdir with proper Unicode handling, and sorted"""
     # passing a unicode directory name gives back unicode filenames, passing a
     # str directory name gives back str filenames. On MacOS, filenames come back
     # in Unicode Normalization Form D, so force to form C.
-    file_list = [ unicodedata.normalize("NFC", nfd) 
-                for nfd in os.listdir(unicode(folder)) ]
+    file_list = [ unicodedata.normalize("NFC", nfd)
+                for nfd in listdir(unicode(folder)) ]
     file_list.sort()
     return file_list
 
@@ -130,14 +140,14 @@ def pout(msg):
         print fsenc(msg)
     except UnicodeError, e:
         print '%s (ignored)' % str(e)
-         
+
 def perr(msg):
     '''Prints a message to sys.stderr, taking care of character encodings.'''
     try:
         print >> sys.stderr, fsenc(msg)
     except UnicodeError, e:
         print >> sys.stderr, '%s (ignored)' % str(e)
-         
+
 def getfilebasename(file_path):
     """returns the name of a file, without the extension. "/a/b/c.txt" -> "c".
     """

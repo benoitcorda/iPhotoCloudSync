@@ -24,6 +24,13 @@ import shutil
 import sys
 import tilutil.systemutils as su
 import unicodedata
+import drive.drive as GDrive
+
+def copy2(source, target, options):
+    if options.drive:
+        return GDrive.api.copy2(source, target)
+    else:
+        return shutil.copy2(source, target)
 
 # ImageMagick "convert" tool. Obsolete - should use _SIPS_TOOL only.
 CONVERT_TOOL = "convert"
@@ -57,10 +64,10 @@ def check_convert():
             found_it = True
     except StandardError:
         pass
-    
+
     if not found_it:
         print >> sys.stderr, """Cannot execute "%s".
-    
+
 Make sure you have ImageMagick installed. You can download a copy
 from http://www.imagemagick.org/script/index.php
 """ % (CONVERT_TOOL)
@@ -261,10 +268,10 @@ class GpsLocation(object):
         """Constructs a GpsLocation object."""
         self.latitude = latitude
         self.longitude = longitude
-        
+
     def from_gdata_point(self, point):
         """Sets location from a Point.
-        
+
         Args:
             point: gdata.geo.Point
         Returns:
@@ -278,11 +285,11 @@ class GpsLocation(object):
             self.latitude = 0.0
             self.longitude = 0.0
         return self
-    
+
     def from_composite(self, latitude, longitude):
         """Sets location from a latitude and longitude in
         "37.642567 N" format.
-        
+
         Args:
             latitude: latitude like "37.645267 N"
             longitude: longitude like "122.419373 W"
@@ -306,11 +313,11 @@ class GpsLocation(object):
     def longitude_ref(self):
         """Returns the longitude suffix as either 'E' or 'W'."""
         return 'E' if self.longitude >= 0.0 else 'W'
-    
+
     def is_same(self, other):
         """Tests if two GpsData locations are equal with regards to GPS accuracy
          (6 decimal digits)
-         
+
          Args:
           other: the GpsLocation to compare against.
         Returns: True if the two locatoins are the same.
@@ -382,7 +389,7 @@ def get_photo_caption(photo, container, caption_template):
         title_description += ': ' + photo.comment
         nodate_title_description += ': ' + photo.comment
     folder_description = container.getcommentwithouthints().strip()
-        
+
     if photo.date:
         year = str(photo.date.year)
         month = str(photo.date.month).zfill(2)
@@ -402,7 +409,7 @@ def get_photo_caption(photo, container, caption_template):
         opt_face_list = ''
     else:
         opt_face_list = '(%s)' % (', '.join(photo.getfaces()))
-    
+
     try:
         return caption_template.format(
             title=photo.caption,
@@ -435,7 +442,7 @@ def format_album_name(album, name, folder_template):
 
     ascii_name = name.encode('ascii', 'replace')
     plain_name = ascii_name.replace(' ', '')
-   
+
     nodate_name = name
     match = re.match(_YEAR_PATTERN_INDEX, name)
     if match:
@@ -453,7 +460,7 @@ def format_album_name(album, name, folder_template):
     folderhint = album.getfolderhint()
     if not folderhint:
         folderhint = ''
-    
+
     try:
         return folder_template.format(
             album=name,
@@ -470,7 +477,7 @@ def format_album_name(album, name, folder_template):
                 'plain_name, hint, yyyy, mm, dd.' % (str(ex)))
         return folder_template
 
-    
+
 def format_photo_name(photo, album_name, index, padded_index,
                       name_template):
     """Formats an image name based on a template."""
@@ -529,7 +536,7 @@ def format_photo_name(photo, album_name, index, padded_index,
                 'event_index0, album, ascii_album, event, ascii_event, title, ascii_title, '
                 'yyyy, mm, or dd.' % (str(ex)))
         formatted_name = name_template
-        
+
     # Take out invalid characters, like '/'
     return make_image_filename(formatted_name)
 
@@ -567,8 +574,8 @@ def copy_or_link_file(source, target, dryrun=False, link=False, size=None,
                 _logger.error(u'%s: %s' % (source, result))
                 return False
         else:
-            _logger.debug(u'shutil.copy2(%s, %s)', source, target)
-            shutil.copy2(source, target)
+            _logger.debug(u'copy2(%s, %s)', source, target)
+            copy2(source, target, options)
         return True
     except (OSError, IOError) as ex:
         _logger.error(u'%s: %s' % (source, str(ex)))
@@ -610,7 +617,7 @@ def get_face_caption_update(iptc_data, old_caption=None, face_list=None):
        None otherwise."""
     if old_caption == None:
         old_caption = iptc_data.caption.strip() if iptc_data.caption else u''
-    new_caption = old_caption            
+    new_caption = old_caption
 
     # See if everybody is mentioned
     all_mentioned = True
