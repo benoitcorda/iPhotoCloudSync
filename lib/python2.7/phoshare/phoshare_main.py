@@ -33,6 +33,8 @@ import tilutil.systemutils as su
 import tilutil.imageutils as imageutils
 import phoshare.phoshare_version
 
+import hashlib
+
 # Maximum diff in file size to be not considered a change (to allow for
 # meta data updates for example)
 _MAX_FILE_DIFF = 60000
@@ -51,6 +53,9 @@ _EXIF_EXTENSIONS = ('3fr', 'arw', 'ciff', 'cr2', 'crw', 'dcr', 'erf', 'jpg', 'jp
 # create logger
 _logger = logging.getLogger('google')
 _logger.setLevel(logging.WARNING)
+
+def md5(full_path):
+    return hashlib.md5(open(full_path, 'rb').read()).hexdigest()
 
 # File operations intercepts
 def join(*arg):
@@ -75,8 +80,6 @@ def isdir(s, options):
         if ext != '': # it's a file, we don't allow dir with dots
             return False
         list_dirs = listdir(path+'/', options)
-        print "isdir for",s,'res',folder in list_dirs
-        print "from",folder,list_dirs
         return folder in list_dirs
     return os.path.isdir(s)
 
@@ -116,10 +119,8 @@ def stat(path, options):
         return os.stat(path)
 
 def getmtime(filename, options):
-    print 'getmtime',path
-    raise "not ready yet check this"
-    if options.drive:
-        return GDrive.api.getmtime(filename)
+    if filename.startswith('gdrive/'):
+        raise  "Not Implemented for GDrive, you shouldn't need this"
     else:
         import os.path
         return os.path.getmtime(filename)
@@ -146,11 +147,9 @@ def mkdir(path, options, mode=0777):
     else:
         return os.mkdir(path, mode=mode)
 
-def makedirs(path, options, mode=0777):
+def makedirs(path, mode=0777):
     import os
-    print 'makedirs',path
-    raise "not ready yet check this"
-    if options.drive:
+    if path.startswith('gdrive/'):
         return GDrive.api.makedirs(path)
     else:
         return os.makedirs(path, mode=mode)
@@ -238,6 +237,13 @@ class ExportFile(object):
           source_file: path to image file, with aliases resolved.
           options: processing options.
         """
+        if options.drive:
+            md5_source = md5(source_file)
+            exist_data = GDrive.api.exists(self.export_file)
+            md5_drive = None
+            if exist_data:
+                md5_drive = exist_data['md5Checksum']
+            return md5_source != md5_drive
         if not exists(self.export_file, options):
             return True
         # In link mode, check the inode.
@@ -587,7 +593,7 @@ class ExportDirectory(object):
         if not exists(self.albumdirectory, options):
             su.pout("Creating folder " + self.albumdirectory)
             if not options.dryrun:
-                makedirs(self.albumdirectory, options)
+                makedirs(self.albumdirectory)
             else:
                 return
         file_list = listdir(self.albumdirectory, options)
@@ -654,7 +660,7 @@ class ExportDirectory(object):
     def generate_files(self, options):
         """Generates the files in the export location."""
         if not exists(self.albumdirectory, options) and not options.dryrun:
-            makedirs(self.albumdirectory, options)
+            makedirs(self.albumdirectory)
         for f in sorted(self.files):
             self.files[f].generate(options)
 
@@ -794,7 +800,7 @@ class ExportLibrary(object):
     def load_album(self, options):
         """Loads an existing album (export folder)."""
         if not exists(self.albumdirectory, options) and not options.dryrun:
-            makedirs(self.albumdirectory, options)
+            makedirs(self.albumdirectory)
 
         album_directories = {}
         for folder in sorted(self.named_folders.values()):
@@ -846,11 +852,10 @@ class ExportLibrary(object):
     def generate_files(self, options):
         """Walks through the export tree and sync the files."""
         if not exists(self.albumdirectory, options) and not options.dryrun:
-            makedirs(self.albumdirectory, options)
+            makedirs(self.albumdirectory)
         for ndir in sorted(self.named_folders):
             if self._check_abort():
                 break
-            print "gen file ",self.named_folders[ndir],'op',options
             self.named_folders[ndir].generate_files(options)
 
 

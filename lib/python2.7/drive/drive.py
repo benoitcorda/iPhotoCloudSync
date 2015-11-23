@@ -206,7 +206,7 @@ class Drive:
 		else:
 			fileList = [i['title'] for i in result]
 			logging.error('Exists call got more than one result: %s, returning first' % fileList)
-			return True
+			return result[0]
 
 	def listdir(self, path, folder_id = None):
 		"""List the content of a provided directory
@@ -224,7 +224,7 @@ class Drive:
 		dirID = folder_id or self.rootDir['id']
 		result = []
 		page_token = None
-		gpath = path[6:-1] # remove 'gdrive'
+		gpath = path[6:] # remove 'gdrive'
 		listOfDirs = [i for i in gpath.split(os.sep) if len(i) > 0]
 		while len(listOfDirs) > 0:
 			current = listOfDirs.pop(0)
@@ -272,10 +272,15 @@ class Drive:
 		Returns:
 			Inserted directory metadata if successful, None otherwise.
 		"""
+
+		if not DirName.startswith('gdrive/'):
+			raise "Error GDrive path must start with  gdrive/"
+
 		if folder_id is None:
 			folder_id = self.rootDir['id']
 
-		listOfDirs = [i for i in DirName.split(os.sep) if len(i) > 0]
+		gDirName = DirName[6:] # remove 'gdrive'
+		listOfDirs = [i for i in gDirName.split(os.sep) if len(i) > 0]
 		while len(listOfDirs) > 0:
 			newDir = listOfDirs.pop(0)
 			existDir = self.ls(newDir, folder_id=folder_id)
@@ -349,9 +354,6 @@ class Drive:
 		raise "WARNING not implemented GDrive stat",FileName
 		logging.error("stat not implement for Gdrive {0}".format(FileName))
 		#raise Exception("Not ready yet")
-
-	def getmtime(self, FileName, folder_id = None):
-		raise "Not ready yet"
 
 	def getsize(self, FileName, folder_id = None):
 		raise "Not ready yet"
