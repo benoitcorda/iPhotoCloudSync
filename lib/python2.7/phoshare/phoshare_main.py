@@ -50,7 +50,7 @@ _EXIF_EXTENSIONS = ('3fr', 'arw', 'ciff', 'cr2', 'crw', 'dcr', 'erf', 'jpg', 'jp
 
 # create logger
 _logger = logging.getLogger('google')
-_logger.setLevel(logging.DEBUG)
+_logger.setLevel(logging.WARNING)
 
 # File operations intercepts
 def join(*arg):

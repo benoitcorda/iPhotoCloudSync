@@ -40,7 +40,7 @@ CLIENT_SECRET_FILE = os.path.join(CUR_DIR,'client_secrets.json')
 PICKLE_CLIENT_SECRET = os.path.join(CUR_DIR,'credentials.pkl')
 
 
-logging.basicConfig(level = logging.ERROR,
+logging.basicConfig(level = logging.WARNING,
 					format = '%(asctime)s - %(filename)s %(lineno)d - %(levelname)s - %(message)s')
 
 # from https://docs.python.org/2/howto/logging-cookbook.html
@@ -121,7 +121,7 @@ class Drive:
 		flow.redirect_uri = oauth2client.client.OOB_CALLBACK_URN
 		authorize_url = flow.step1_get_authorize_url()
 
-		logging.debug("Go to the following link in your browser: {0}".format(authorize_url))
+		logging.warning("Go to the following link in your browser: {0}".format(authorize_url))
 		code = raw_input('Enter verification code: ').strip()
 		self.credentials = flow.step2_exchange(code)
 
