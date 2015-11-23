@@ -206,7 +206,7 @@ class Drive:
 		else:
 			fileList = [i['title'] for i in result]
 			logging.error('Exists call got more than one result: %s, returning first' % fileList)
-			return True
+			return result[0]
 
 	def listdir(self, path, folder_id = None):
 		"""List the content of a provided directory
@@ -349,9 +349,6 @@ class Drive:
 		raise "WARNING not implemented GDrive stat",FileName
 		logging.error("stat not implement for Gdrive {0}".format(FileName))
 		#raise Exception("Not ready yet")
-
-	def getmtime(self, FileName, folder_id = None):
-		raise "Not ready yet"
 
 	def getsize(self, FileName, folder_id = None):
 		raise "Not ready yet"
