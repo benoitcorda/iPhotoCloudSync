@@ -224,7 +224,7 @@ class Drive:
 		dirID = folder_id or self.rootDir['id']
 		result = []
 		page_token = None
-		gpath = path[6:-1] # remove 'gdrive'
+		gpath = path[6:] # remove 'gdrive'
 		listOfDirs = [i for i in gpath.split(os.sep) if len(i) > 0]
 		while len(listOfDirs) > 0:
 			current = listOfDirs.pop(0)
