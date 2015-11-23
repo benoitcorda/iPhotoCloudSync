@@ -59,70 +59,104 @@ def join(*arg):
 
 def exists(path, options):
     import os.path
-    if options.drive:
-        if path == '/':
+    if options.drive and path.startswith('gdrive/'):
+        if path == 'gdrive/':
             return True
         _logger.debug(u'exists "%s".', path)
         return GDrive.api.exists(path)
     else:
         return os.path.exists(path)
 
-def isdir(s):
+def isdir(s, options):
     import os.path
+    if s.startswith('gdrive/'):
+        path, folder = os.path.split(s)
+        _, ext = os.path.splitext(folder)
+        if ext != '': # it's a file, we don't allow dir with dots
+            return False
+        list_dirs = listdir(path+'/', options)
+        print "isdir for",s,'res',folder in list_dirs
+        print "from",folder,list_dirs
+        return folder in list_dirs
     return os.path.isdir(s)
 
 def listdir(path, options):
     import os
-    if options.drive:
+    if options.drive and path.startswith('gdrive/'):
         _logger.debug(u'listdir "%s".', path)
         return GDrive.api.listdir(path)
     else:
         return os.listdir(path)
 
-def rmdir(path):
-    raise "Not ready yet"
+def rmdir(path, options):
     import os
-    return os.rmdir(path)
+    print 'rmdir',path
+    raise "not ready yet check this"
+    if options.drive:
+        return GDrive.api.rmdir(path)
+    else:
+        return os.rmdir(path)
 
-def remove(path):
-    raise "Not ready yet"
+def remove(path, options):
     import os
-    return os.remove(path)
+    print 'remove',path
+    raise "not ready yet check this"
+    if options.drive:
+        return GDrive.api.remove(path)
+    else:
+        return os.remove(path)
 
-def stat(path):
-    raise "Not ready yet"
-    import os
-    return os.stat(path)
+def stat(path, options):
+    print 'stat',path
+    raise "not ready yet check this"
+    if options.drive:
+        return GDrive.api.stat(path)
+    else:
+        import os
+        return os.stat(path)
 
-def getmtime(filename):
-    raise "Not ready yet"
-    import os.path
-    return os.path.getmtime(filename)
+def getmtime(filename, options):
+    print 'getmtime',path
+    raise "not ready yet check this"
+    if options.drive:
+        return GDrive.api.getmtime(filename)
+    else:
+        import os.path
+        return os.path.getmtime(filename)
 
-def getsize(filename):
-    raise "Not ready yet"
-    import os.path
-    return os.path.getsize(filename)
+def getsize(filename, options):
+    print 'getsize',filename
+    raise "not ready yet check this"
+    if options.drive:
+        return GDrive.api.getsize(filename)
+    else:
+        import os.path
+        return os.path.getsize(filename)
 
 def split(p):
-    raise "Not ready yet"
     import os.path
     return os.path.split(p)
 
-def mkdir(path, mode=0777):
-    raise "Not ready yet"
+def mkdir(path, options, mode=0777):
     import os
-    return os.mkdir(path, mode=mode)
+    print 'mkdir',path
+    raise "not ready yet check this"
+    if options.drive:
+        return GDrive.api.makedirs(path)
+    else:
+        return os.mkdir(path, mode=mode)
 
 def makedirs(path, options, mode=0777):
     import os
+    print 'makedirs',path
+    raise "not ready yet check this"
     if options.drive:
         return GDrive.api.makedirs(path)
     else:
         return os.makedirs(path, mode=mode)
 
 # END File operations intercepts
-  
+
 def region_matches(region1, region2):
     """Tests if two regions (rectangles) match."""
     if len(region1) != len(region2):
@@ -148,14 +182,14 @@ def delete_album_file(album_file, albumdirectory, msg, options):
         return True
 
     try:
-        if isdir(album_file):
+        if isdir(album_file, options):
             file_list = listdir(album_file, options)
             for subfile in file_list:
                 delete_album_file(join(album_file, subfile),
                                   albumdirectory, msg, options)
-            rmdir(album_file)
+            rmdir(album_file, options)
         else:
-            remove(album_file)
+            remove(album_file, options)
         return True
     except OSError, ex:
         print >> sys.stderr, "Could not delete %s: %s" % (su.fsenc(album_file),
@@ -208,37 +242,37 @@ class ExportFile(object):
             return True
         # In link mode, check the inode.
         if options.link:
-            export_stat = stat(self.export_file)
-            source_stat = stat(source_file)
+            export_stat = stat(self.export_file, options)
+            source_stat = stat(source_file, options)
             if export_stat.st_ino != source_stat.st_ino:
                 su.pout('Changed:  %s: inodes don\'t match: %d vs. %d' %
                     (self.export_file, export_stat.st_ino, source_stat.st_ino))
                 return True
         if (not options.reverse
-            and getmtime(self.export_file) + _MTIME_FUDGE <
-            getmtime(source_file)):
+            and getmtime(self.export_file, options) + _MTIME_FUDGE <
+            getmtime(source_file, options)):
             su.pout('Changed:  %s: newer version is available: %s vs. %s' %
                     (self.export_file,
-                     time.ctime(getmtime(self.export_file)),
-                     time.ctime(getmtime(source_file))))
+                     time.ctime(getmtime(self.export_file, options)),
+                     time.ctime(getmtime(source_file, options))))
             return True
 
         if (options.reverse
-            and getmtime(source_file) + _MTIME_FUDGE <
-            getmtime(self.export_file)):
+            and getmtime(source_file, options) + _MTIME_FUDGE <
+            getmtime(self.export_file, options)):
             su.pout('Changed:  %s: newer version is available: %s vs. %s' %
                     (self.export_file,
-                     time.ctime(getmtime(source_file)),
-                     time.ctime(getmtime(self.export_file))))
+                     time.ctime(getmtime(source_file, options)),
+                     time.ctime(getmtime(self.export_file, options))))
             return True
-        
+
         if not self.size and not options.reverse:
             # With creative renaming in iPhoto it is possible to get
             # stale files if titles get swapped between images. Double
             # check the size, allowing for some difference for meta data
             # changes made in the exported copy
-            source_size = getsize(source_file)
-            export_size = getsize(self.export_file)
+            source_size = getsize(source_file, options)
+            export_size = getsize(self.export_file, options)
             diff = abs(source_size - export_size)
             if diff > _MAX_FILE_DIFF or (diff > 32 and options.link):
                 su.pout('Changed:  %s: file size: %d vs. %d' %
@@ -276,28 +310,28 @@ class ExportFile(object):
         if not exists(export_dir, options):
             su.pout("Creating folder " + export_dir)
             if not options.dryrun:
-                mkdir(export_dir)
+                mkdir(export_dir, options)
         original_source_file = su.resolve_alias(self.photo.originalpath)
         if exists(self.original_export_file, options):
             # In link mode, check the inode.
             if options.link:
-                export_stat = stat(self.original_export_file)
-                source_stat = stat(original_source_file)
+                export_stat = stat(self.original_export_file, options)
+                source_stat = stat(original_source_file, options)
                 if export_stat.st_ino != source_stat.st_ino:
                     su.pout('Changed:  %s: inodes don\'t match: %d vs. %d' %
                             (self.original_export_file, export_stat.st_ino, source_stat.st_ino))
                     do_original_export = True
-            if (getmtime(self.original_export_file) + _MTIME_FUDGE <
-                getmtime(original_source_file)):
+            if (getmtime(self.original_export_file, options) + _MTIME_FUDGE <
+                getmtime(original_source_file, options)):
                 su.pout('Changed:  %s: newer version is available: %s vs. %s' %
                         (self.original_export_file,
                          time.ctime(getmtime(
-                             self.original_export_file)),
-                         time.ctime(getmtime(original_source_file))))
+                             self.original_export_file, options)),
+                         time.ctime(getmtime(original_source_file, options))))
                 do_original_export = True
             elif not self.size:
-                source_size = getsize(original_source_file)
-                export_size = getsize(self.original_export_file)
+                source_size = getsize(original_source_file, options)
+                export_size = getsize(self.original_export_file, options)
                 diff = abs(source_size - export_size)
                 if diff > _MAX_FILE_DIFF or (diff > 0 and options.link):
                     su.pout(u'Changed:  %s: file size: %d vs. %d' %
@@ -400,7 +434,7 @@ class ExportFile(object):
                     (len(region_rectangles), len(photo_rectangles)))
             #su.pout('%s vs %s' % (combined_region_names, combined_photo_faces))
             #su.pout('%s vs %s' % (region_rectangles, photo_rectangles))
-            
+
             return (photo_rectangles, photo_faces)
 
         for p in xrange(len(region_rectangles)):
@@ -413,7 +447,7 @@ class ExportFile(object):
                 return (photo_rectangles, photo_faces)
 
         return (None, None)
-    
+
     def check_iptc_data(self, export_file, options, is_original=False, file_updated=False):
         """Tests if a file has the proper keywords and caption in the meta
            data."""
@@ -422,7 +456,7 @@ class ExportFile(object):
         messages = []
 
         iptc_data = exiftool.get_iptc_data(export_file)
-         
+
         new_caption = imageutils.get_photo_caption(self.photo, self.container,
                                                    options.captiontemplate)
         if not su.equalscontent(iptc_data.caption, new_caption):
@@ -449,7 +483,7 @@ class ExportFile(object):
             #    messages.append(u'  File date:   %s' % (date_time_original))
             #    messages.append(u'  iPhoto date: %s' % (self.photo.date))
             #    new_date = self.photo.date
- 
+
             if self.photo.rating != None and iptc_data.rating != self.photo.rating:
                 messages.append(u'  File rating:   %d' % (iptc_data.rating))
                 messages.append(u'  iPhoto rating: %d' % (self.photo.rating))
@@ -554,7 +588,7 @@ class ExportDirectory(object):
             su.pout("Creating folder " + self.albumdirectory)
             if not options.dryrun:
                 makedirs(self.albumdirectory, options)
-            else: 
+            else:
                 return
         file_list = listdir(self.albumdirectory, options)
         if file_list is None:
@@ -568,7 +602,7 @@ class ExportDirectory(object):
             album_file = unicodedata.normalize("NFC",
                                                join(self.albumdirectory,
                                                             f))
-            if isdir(album_file):
+            if isdir(album_file, options):
                 if (options.originals and
                     (f == "Originals" or (options.picasa and
                                           f == ".picasaoriginals"))):
@@ -600,7 +634,7 @@ class ExportDirectory(object):
                 continue
 
             originalfile = unicodedata.normalize("NFC", join(folder, f))
-            if isdir(originalfile):
+            if isdir(originalfile, options):
                 delete_album_file(originalfile, self.albumdirectory,
                                   "Obsolete export Originals directory",
                                   options)
@@ -683,7 +717,7 @@ class ExportLibrary(object):
             for pattern in su.unicode_string(options.folderpatterns).split(','):
                 (expression, folder) = pattern.split('/', 2)
                 folderpatterns.append((re.compile(expression), folder))
-                
+
         # first, do the sub-albums
         for sub_album in albums:
             if self._check_abort():
@@ -692,7 +726,7 @@ class ExportLibrary(object):
             if not sub_name:
                 print "Found an album with no name: " + sub_album.albumid
                 sub_name = "xxx"
-            
+
             # check the album type
             if sub_album.albumtype == "Folder" or sub_album.albums:
                 sub_matched = matched
@@ -732,7 +766,7 @@ class ExportLibrary(object):
                             su.pout("Using folder %s for album %s." % (folder, sub_album.name))
                         folder_hint = folder
                         break
-          
+
             prefix = folder_prefix
 
             if folder_hint is not None:
@@ -782,11 +816,12 @@ class ExportLibrary(object):
         if not exists(directory, options):
             return True
         contains_albums = False
+
         for f in su.os_listdir_unicode(directory):
             if self._check_abort():
                 return
             album_file = join(directory, f)
-            if isdir(album_file):
+            if isdir(album_file, options):
                 if f == "iPod Photo Cache":
                     su.pout("Skipping " + album_file)
                     continue
@@ -815,6 +850,7 @@ class ExportLibrary(object):
         for ndir in sorted(self.named_folders):
             if self._check_abort():
                 break
+            print "gen file ",self.named_folders[ndir],'op',options
             self.named_folders[ndir].generate_files(options)
 
 
@@ -900,7 +936,7 @@ def get_option_parser():
                  help="Copy faces into metadata.")
     p.add_option("--folderhints", dest="folderhints", action="store_true",
                  help="Scan event and album descriptions for folder hints.")
-    p.add_option("--folderpatterns", 
+    p.add_option("--folderpatterns",
                  help="""List of regular expressions and folder names, for
                  mapping events and albums to folers. Format is
                  <pattern1>/<folder1>,<pattern2>/<folder2>,...""")
@@ -910,7 +946,7 @@ def get_option_parser():
                  help="Process GPS location information")
     p.add_option('--ignore',
                  help="""Pattern for folders to ignore in the export folder (use
-                      with --delete if you have extra folders folders that you 
+                      with --delete if you have extra folders folders that you
                       don't want iphoto_export to delete.""")
     p.add_option("--iphoto",
                  help="""Path to iPhoto library, e.g.
@@ -973,9 +1009,9 @@ def get_option_parser():
         "-x", "--exclude",
         help="""Don't export matching albums or events. The pattern is a
         regular expression.""")
-    p.add_option('--verbose', action='store_true', 
+    p.add_option('--verbose', action='store_true',
                  help='Print verbose messages.')
-    p.add_option('--version', action='store_true', 
+    p.add_option('--version', action='store_true',
                  help='Print build version and exit.')
     return p
 
@@ -1038,7 +1074,7 @@ def run_phoshare(cmd_args):
                                        verbose=options.verbose, aperture=options.aperture)
     if options.originals and options.export:
         data.load_aperture_originals()
-        
+
     options.aperture = data.aperture and not data.aperture_data
     options.foldertemplate = unicode(options.foldertemplate)
     options.nametemplate = unicode(options.nametemplate)
@@ -1048,7 +1084,7 @@ def run_phoshare(cmd_args):
         data.checkalbumsizes(int(options.checkalbumsize))
 
     if options.drive:
-        album = ExportLibrary('/')
+        album = ExportLibrary('gdrive/')
         export_iphoto(album, data, options.exclude, options)
     elif options.export:
         album = ExportLibrary(su.expand_home_folder(options.export))
