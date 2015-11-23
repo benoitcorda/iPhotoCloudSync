@@ -272,10 +272,15 @@ class Drive:
 		Returns:
 			Inserted directory metadata if successful, None otherwise.
 		"""
+
+		if not DirName.startswith('gdrive/'):
+			raise "Error GDrive path must start with  gdrive/"
+
 		if folder_id is None:
 			folder_id = self.rootDir['id']
 
-		listOfDirs = [i for i in DirName.split(os.sep) if len(i) > 0]
+		gDirName = DirName[6:] # remove 'gdrive'
+		listOfDirs = [i for i in gDirName.split(os.sep) if len(i) > 0]
 		while len(listOfDirs) > 0:
 			newDir = listOfDirs.pop(0)
 			existDir = self.ls(newDir, folder_id=folder_id)
