@@ -153,10 +153,10 @@ class Drive:
 				param = {}
 				if page_token:
 					param['pageToken'] = page_token
-				param['q'] = "title contains '{name}'".format(name = Name)
+				param['q'] = u"title contains '{name}'".format(name = Name)
 				param['q'] += " and trashed=false"
 				if folder_id is not None:
-					param['q'] += " and '{id}' in parents".format(id = folder_id)
+					param['q'] += u" and '{id}' in parents".format(id = folder_id)
 				files = self.service.files().list(**param).execute()
 
 				result.extend(files['items'])
@@ -228,9 +228,9 @@ class Drive:
 		listOfDirs = [i for i in gpath.split(os.sep) if len(i) > 0]
 		while len(listOfDirs) > 0:
 			current = listOfDirs.pop(0)
-			logging.debug("listdir current Dir {0}".format(current))
+			logging.debug(u"listdir current Dir {0}".format(current))
 			result = self.ls(current, folder_id = dirID)
-			logging.debug("listdir result Dir {0}".format(result))
+			logging.debug(u"listdir result Dir {0}".format(result))
 			if len(result) > 0:
 				dirID = result[0].get('id')
 		#rebuild path from results
@@ -257,7 +257,7 @@ class Drive:
 		elif self.rootDir is not None:
 			body["parents"] = [{"id" : self.rootDir['id']}]
 		folder = self.service.files().insert(body = body).execute()
-		logging.debug("Created Folder {0}".format(folder['title']))
+		logging.debug(u"Created Folder {0}".format(folder['title']))
 		return folder
 
 	def makedirs(self, DirName, folder_id = None):
@@ -287,12 +287,12 @@ class Drive:
 			if len(existDir) > 0:
 				folder = existDir[0]
 				folder_id = existDir[0]['id']
-				logging.info("Dir {0} exists with id {1}, skipped".format(newDir, existDir[0]['id']))
+				logging.info(u"Dir {0} exists with id {1}, skipped".format(newDir, existDir[0]['id']))
 				continue
 			folder = self.mkdir(newDir, folder_id=folder_id)
 			folder_id = folder['id']
 
-		logging.debug("Created Folder {0}".format(DirName))
+		logging.debug(u"Created Folder {0}".format(DirName))
 		return folder
 
 	def insert(self, file_path, title = None, description = None, folder_id = None, mime_type = '*/*'):
@@ -334,7 +334,7 @@ class Drive:
 			file = self.service.files().insert(
 			    body = body,
 			    media_body = media_body).execute()
-			logging.debug("File created {0} inside {1}".format(title, body['parents']))
+			logging.debug(u"File created {0} inside {1}".format(title, body['parents']))
 			return file
 		except errors.HttpError, error:
 			logging.error('An error occured: %s' % error)
@@ -352,7 +352,7 @@ class Drive:
 
 	def stat(self, FileName, folder_id = None):
 		raise "WARNING not implemented GDrive stat",FileName
-		logging.error("stat not implement for Gdrive {0}".format(FileName))
+		logging.error(u"stat not implement for Gdrive {0}".format(FileName))
 		#raise Exception("Not ready yet")
 
 	def getsize(self, FileName, folder_id = None):
