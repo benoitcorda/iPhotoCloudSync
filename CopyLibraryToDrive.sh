@@ -15,9 +15,9 @@ export PYTHONPATH && python Phoshare.py \
 --drive \
 --update \
 --folderhints \
---facealbums \
---facealbum_prefix=FACES_ \
---face_keywords \
--f \
+# --facealbums \
+# --facealbum_prefix=FACES_ \
+# --face_keywords \
+# -f \
 --gps \
 #--dryrun

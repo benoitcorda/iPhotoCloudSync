@@ -341,13 +341,10 @@ class Drive:
 			return None
 
 	def copy2(self, source, target, folder_id = None):
-		print "s",source, "tar",target
 		filename = os.path.basename(target)
 		dirname =  os.path.dirname(target)
 		folder = self.exists(dirname)
 		mime_type = mimetypes.types_map[os.path.splitext(filename)[-1]]
-		print folder['id']
-		print (filename, folder['id'], mime_type)
 		self.insert(source, title = filename, folder_id = folder['id'], mime_type = mime_type)
 
 	def stat(self, FileName, folder_id = None):
