@@ -68,6 +68,8 @@ class Drive:
 	rootDir = None
 	# Default directory to put the photos
 	photoFolder = 'iPhotos'
+	# File to keep the list of uploaded files with their checksums.
+	checksumCacheFileName = 'checksum.appcache'
 
 	def __init__(self, PICKLE_CLIENT_SECRET = PICKLE_CLIENT_SECRET, CLIENT_SECRET_FILE = CLIENT_SECRET_FILE):
 		"""Create an instance of GoogleDrive.
@@ -90,11 +92,13 @@ class Drive:
 
 		# go to iPhoto folder
 		iPhoto_folder = None
-		founds = self.ls(self.photoFolder)
-		for f in self.ls(self.photoFolder):
+		for f in self._ls(self.photoFolder):
 			for p in f['parents']:
 				if p['isRoot']:
 					iPhoto_folder = f
+					break
+			if iPhoto_folder is not None:
+				break
 
 		logging.debug("found iPhoto_folder {0}".format(iPhoto_folder))
 
@@ -136,8 +140,8 @@ class Drive:
 	################
 	# file functions
 	################
-	def ls(self, Name, folder_id = None):
-		"""Retrieve a list of File metadata.
+	def _ls(self, Name, folder_id = None):
+		"""Retrieve a list of File metadata when providing the folder_id.
 
 		Args:
 			name: the string to search for.
@@ -168,6 +172,40 @@ class Drive:
 				break
 		return result
 
+	def ls(self, path, folder_id = None):
+		"""Retrieve a list of File metadata (e.g. gdrive/a/b/*.jpg).
+
+		Args:
+			path: the string to search for based on absolute path.
+		Key Args:
+			folder_id: directory's ID where the relative path starts at, if not provided you must start the path with gdrive/
+		Returns:
+			List of Files metadata (empty list if no result).
+		"""
+
+		if folder_id is None and not path.startswith('gdrive/'):
+			raise "Error GDrive path must start with  gdrive/ or you need to provide a folder_id"
+
+		result = []
+		page_token = None
+		gpath = path[6:] # remove 'gdrive'
+		listOfDirs = [i for i in gpath.split(os.sep) if len(i) > 0]
+		dirID = folder_id or self.rootDir['id']
+		if len(listOfDirs) == 0:
+			listOfDirs = ['*']
+		# go down the directory tree while having subdirectories
+		while len(listOfDirs) > 1:
+			current = listOfDirs.pop(0)
+			logging.debug(u"ls current Dir {0}".format(current))
+			result = self._ls(current, folder_id = dirID)
+			logging.debug(u"ls result Dir {0}".format(result))
+			if len(result) > 0:
+				dirID = result[0].get('id')
+			else:
+				logging.error('Path not found while trying to run ls for: %s' % path)
+				return []
+		return self._ls(listOfDirs.pop(0), folder_id = dirID)
+
 	def exists(self, Name, folder_id = None):
 		"""Test whether the file with Name exit in the directory with folder_id
 
@@ -179,24 +217,10 @@ class Drive:
 			either None if nothing or return the file metadata.
 		"""
 
-		if not Name.startswith('gdrive/'):
-			raise "Error GDrive path must start with  gdrive/"
+		if Name == 'gdrive' and folder_id is None:
+			return self.rootDir
 
-		dirID = folder_id or self.rootDir['id']
-		result = []
-		page_token = None
-		path = Name[6:] # remove 'gdrive'
-		listOfDirs = [i for i in path.split(os.sep) if len(i) > 0]
-		while len(listOfDirs) > 0:
-			current = listOfDirs.pop(0)
-			result = self.ls(current, folder_id = dirID)
-			if len(result) == 0:
-				return False
-			if len(result) > 1:
-				fileList = [i['title'] for i in result]
-				logging.error("Ambigous result for Exist(%s)", path)
-				logging.error('Exists routine got more than one result: %s, using first' % fileList)
-			dirID = result[0]['id']
+		result = self.ls(Name, folder_id = folder_id)
 
 		if len(result) == 0:
 			return False
@@ -218,23 +242,17 @@ class Drive:
 		Returns:
 			a list containing the names of the entries in the directory."""
 
-		if not path.startswith('gdrive/'):
-			raise "Error GDrive path must start with  gdrive/"
+		# treat the root dir as special case
+		if (path == 'gdrive' or path == 'gdrive/') and folder_id is None:
+			files = self._ls('*', folder_id = self.rootDir['id'])
+			return [i['title'] for i in files]
 
-		dirID = folder_id or self.rootDir['id']
-		result = []
-		page_token = None
-		gpath = path[6:] # remove 'gdrive'
-		listOfDirs = [i for i in gpath.split(os.sep) if len(i) > 0]
-		while len(listOfDirs) > 0:
-			current = listOfDirs.pop(0)
-			logging.debug(u"listdir current Dir {0}".format(current))
-			result = self.ls(current, folder_id = dirID)
-			logging.debug(u"listdir result Dir {0}".format(result))
-			if len(result) > 0:
-				dirID = result[0].get('id')
+		result = self.ls(path, folder_id = folder_id)
+		if len(result) == 0:
+			logging.error('Path not found while trying to run listdir for: %s' % path)
+			return []
 		#rebuild path from results
-		files = self.ls('*', folder_id = dirID)
+		files = self._ls('*', folder_id = result[0]['id'])
 		return [i['title'] for i in files]
 
 	def mkdir(self, DirName, folder_id = None):
@@ -273,7 +291,7 @@ class Drive:
 			Inserted directory metadata if successful, None otherwise.
 		"""
 
-		if not DirName.startswith('gdrive/'):
+		if not DirName.startswith('gdrive/') and folder_id is not None:
 			raise "Error GDrive path must start with  gdrive/"
 
 		if folder_id is None:
@@ -283,7 +301,7 @@ class Drive:
 		listOfDirs = [i for i in gDirName.split(os.sep) if len(i) > 0]
 		while len(listOfDirs) > 0:
 			newDir = listOfDirs.pop(0)
-			existDir = self.ls(newDir, folder_id=folder_id)
+			existDir = self._ls(newDir, folder_id=folder_id)
 			if len(existDir) > 0:
 				folder = existDir[0]
 				folder_id = existDir[0]['id']
@@ -344,13 +362,40 @@ class Drive:
 		filename = os.path.basename(target)
 		dirname =  os.path.dirname(target)
 		folder = self.exists(dirname)
+		if not folder:
+			logging.error("Folder doesn't exist, you need to mkdir '%s' beforehand" % dirname)
+			return None
 		mime_type = mimetypes.types_map[os.path.splitext(filename)[-1]]
 		self.insert(source, title = filename, folder_id = folder['id'], mime_type = mime_type)
 
 	def stat(self, FileName, folder_id = None):
 		raise "WARNING not implemented GDrive stat",FileName
 		logging.error(u"stat not implement for Gdrive {0}".format(FileName))
-		#raise Exception("Not ready yet")
+
+
+	def wget(self, source, target, folder_id = None):
+		"""Download a file's content into target file.
+
+		Args:
+		source: absolute path in gdrive/ or relative with folder_id.
+		target: downloaded content output file.
+
+		Returns:
+		File's content if successful, None otherwise.
+		"""
+		result = self.ls(source, folder_id = folder_id)
+		if len(result) == 0:
+			return None
+		download_url = result[0]['downloadUrl']
+		if download_url:
+			resp, content = self.service._http.request(download_url)
+			if resp.status == 200:
+				logging.debug("wget Status: %s" % resp)
+				with open(target, 'a') as target_file:
+					target_file.write(content)
+			else:
+				logging.error("An error occurred while downloading file '%s'" % resp)
+				return None
 
 	def getsize(self, FileName, folder_id = None):
 		raise "Not ready yet"
