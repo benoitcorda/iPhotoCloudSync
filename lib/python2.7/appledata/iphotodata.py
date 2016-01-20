@@ -197,7 +197,7 @@ class IPhotoData(object):
     rolls = property(_getrolls, "List of rolls (events)")
 
     def getroll(self, album_id):
-        return self._rolls.get(album_id)    
+        return self._rolls.get(album_id)
 
     def getbaseimages(self, base_name):
         """returns an IPhotoImage list of all images with a matching base name.
@@ -230,11 +230,11 @@ class IPhotoData(object):
         messages = []
         for album in self._rolls.values():
             if album.size > max_size:
-                messages.append("%s: event too large (%d)" % (album.name, 
+                messages.append("%s: event too large (%d)" % (album.name,
                                                               album.size))
         for album in self.albums.values():
             if album.albumtype == "Regular" and album.size > max_size:
-                messages.append("%s: album too large (%d)" % (album.name, 
+                messages.append("%s: album too large (%d)" % (album.name,
                                                               album.size))
         messages.sort()
         for message in messages:
@@ -269,7 +269,7 @@ class IPhotoData(object):
                 su.pout("Warning: only in Master Image List, but not in Photos album: %s" % (
                     image.caption))
                 print image
-            
+
     def load_aperture_originals(self):
         """Attempts to locate the original image files (Masters). Only works if
            the masters are stored in the library."""
@@ -437,7 +437,7 @@ class IPhotoImage(object):
                 su.pout(u"%s: full size preview not up to date." % (self.caption))
         else:
             self.originalpath = data.get("OriginalPath")
-        self.roll = data.get("Roll") 
+        self.roll = data.get("Roll")
 
         self.albums = []  # list of albums that this image belongs to
         self.faces = []
@@ -588,7 +588,7 @@ class IPhotoContainer(object):
         # The iPhoto master album has no album type.
         if not albumtype and data and data.has_key("Master"):
             albumtype = 'Master'
-            
+
         # Convert Aperture numeric album types to iPhoto album type names.
         if albumtype in _APERTURE_ALBUM_TYPES:
             albumtype = _APERTURE_ALBUM_TYPES[albumtype]
@@ -632,7 +632,7 @@ class IPhotoContainer(object):
                     if verbose:
                         su.pout(u"%s: image with id %s does not exist - could be hidden." % (name,
                                                                                              key))
-        
+
         if hidden:
             su.pout(u"%s: %d images not exported (probably hidden)." % (name, hidden))
 
@@ -733,8 +733,8 @@ class IPhotoRoll(IPhotoContainer):
         self.albumid = data.get("RollID")
         if not self.albumid:
             self.albumid = data.get("AlbumId")
-     
-       
+
+
 
 
 class IPhotoAlbum(IPhotoContainer):
@@ -808,7 +808,7 @@ def get_album_xmlfile(library_dir):
             return album_xml_file
         album_xml_file = os.path.join(library_dir, "ApertureData.xml")
         if os.path.exists(album_xml_file):
-            return album_xml_file 
+            return album_xml_file
     raise ValueError, ("%s does not appear to be a valid iPhoto or Aperture "
                        "library location.") % (library_dir)
 
@@ -839,9 +839,9 @@ def get_iphoto_data(album_xml_file, ratings=None, verbose=False, aperture=False)
     #        if verbose:
     #            su.pout("Reading event and album data from %s..." % (album_xml_file2))
     #        album_xml2 = applexml.read_applexml(album_xml_file2)
-    
+
     application_version = album_xml.get("Application Version")
-        
+
     if (application_version.startswith('3.')
         or application_version.startswith('9.')):
 	is_aperture = True

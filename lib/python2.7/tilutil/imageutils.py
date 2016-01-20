@@ -159,7 +159,7 @@ def is_sharable_image_file(file_name):
 
 def is_movie_file(file_name):
     """Tests if the file (name or full path) is a movie file."""
-    return su.getfileextension(file_name) in ("mov", "avi", "m4v", "mpg", "3pg")
+    return su.getfileextension(file_name) in ("mov", "avi", "m4v", "mpg", "3pg", "mp4")
 
 def is_media_file(file_name):
     """Tests if the file (name or full path) is either an image or a movie file
