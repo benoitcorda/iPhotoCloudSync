@@ -66,10 +66,12 @@ class Drive:
 	service = None
 	# ParentId of the root directory, to keep track of where we are.
 	rootDir = None
+	# Hardcoded prefix refering to google drive root directory. (make sure to end with '/' if you change this!)
+	prefix = 'gdrive/'
 	# Default directory to put the photos
 	photoFolder = 'iPhotos'
 	# File to keep the list of uploaded files with their checksums.
-	checksumCacheFileName = 'checksum.appcache'
+	checksumCacheFileName = prefix + 'checksum.appcache'
 
 	def __init__(self, PICKLE_CLIENT_SECRET = PICKLE_CLIENT_SECRET, CLIENT_SECRET_FILE = CLIENT_SECRET_FILE):
 		"""Create an instance of GoogleDrive.
@@ -132,7 +134,7 @@ class Drive:
 
 	def getCheckSumCache(self):
 		"""Fetch the checksumCache file and return the content or None is not found"""
-		content = self.wget("gdrive/"+self.checksumCacheFileName)
+		content = self.wget(self.checksumCacheFileName)
 		if content is not None:
 			try:
 				import cPickle as pickle
@@ -196,12 +198,12 @@ class Drive:
 			List of Files metadata (empty list if no result).
 		"""
 
-		if folder_id is None and not path.startswith('gdrive/'):
-			raise "Error GDrive path must start with  gdrive/ or you need to provide a folder_id"
+		if folder_id is None and not path.startswith(self.prefix):
+			raise NameError("Error GDrive path must start with  '%s' or you need to provide a folder_id" % self.prefix)
 
 		result = []
 		page_token = None
-		gpath = path[6:] # remove 'gdrive'
+		gpath = path[len(self.prefix)-1:] # remove prefix without ending slash
 		listOfDirs = [i for i in gpath.split(os.sep) if len(i) > 0]
 		dirID = folder_id or self.rootDir['id']
 		if len(listOfDirs) == 0:
@@ -230,7 +232,7 @@ class Drive:
 			either None if nothing or return the file metadata.
 		"""
 
-		if Name == 'gdrive' and folder_id is None:
+		if Name == self.prefix[:-1] and folder_id is None:
 			return self.rootDir
 
 		result = self.ls(Name, folder_id = folder_id)
@@ -256,7 +258,7 @@ class Drive:
 			a list containing the names of the entries in the directory."""
 
 		# treat the root dir as special case
-		if (path == 'gdrive' or path == 'gdrive/') and folder_id is None:
+		if (path == self.prefix[:-1] or path == self.prefix) and folder_id is None:
 			files = self._ls('*', folder_id = self.rootDir['id'])
 			return [i['title'] for i in files]
 
@@ -304,13 +306,14 @@ class Drive:
 			Inserted directory metadata if successful, None otherwise.
 		"""
 
-		if not DirName.startswith('gdrive/') and folder_id is not None:
-			raise "Error GDrive path must start with  gdrive/"
+		if not DirName.startswith(self.prefix) and folder_id is None:
+			raise NameError("Error GDrive path must start with '%s'" % self.prefix)
+
 
 		if folder_id is None:
 			folder_id = self.rootDir['id']
 
-		gDirName = DirName[6:] # remove 'gdrive'
+		gDirName = DirName[len(self.prefix)-1:] # remove prefix without ending slash
 		listOfDirs = [i for i in gDirName.split(os.sep) if len(i) > 0]
 		while len(listOfDirs) > 0:
 			newDir = listOfDirs.pop(0)
@@ -382,8 +385,7 @@ class Drive:
 		self.insert(source, title = filename, folder_id = folder['id'], mime_type = mime_type)
 
 	def stat(self, FileName, folder_id = None):
-		raise "WARNING not implemented GDrive stat",FileName
-		logging.error(u"stat not implement for Gdrive {0}".format(FileName))
+		raise "WARNING not implemented GDrive stat " + FileName
 
 
 	def wget(self, source, folder_id = None):
