@@ -144,6 +144,39 @@ class Drive:
 		else:
 			return None
 
+	def updateCheckSumCache(self, new_cache = None):
+		"""Update the checksumCacheFileName the checksumCache file
+
+		Args:
+			new_cache: new content to replace with, if None default is self.checksumCache,
+			           if you provide new_cache we will also override self.checksumCache.
+		"""
+		try:
+			import cPickle as pickle
+		except:
+			import pickle
+		import tempfile
+		if new_cache is None:
+			new_cache = self.checksumCache
+		else:
+			self.checksumCache = new_cache
+		if new_cache is None:
+			logging.warning("Can't updateCheckSumCache no content provided/found please provide 'new_cache' argument")
+			return
+
+		filename = '/tmp/checksumcache.%s' % os.getpid()
+		temp = open(filename, 'w+b')
+		try:
+			pickle.dump(new_cache, temp, pickle.HIGHEST_PROTOCOL)
+			temp.close()
+			# remove old one.
+			if self.exists(self.checksumCacheFileName):
+				self.remove(self.checksumCacheFileName)
+			# upload to gdrive.
+			self.copy2(filename, self.checksumCacheFileName)
+		finally:
+			os.remove(filename)
+
 	def oauth(self):
 		"""Create an authorized Drive API client service."""
 		assert self.credentials is not None
@@ -378,15 +411,13 @@ class Drive:
 		filename = os.path.basename(target)
 		dirname =  os.path.dirname(target)
 		folder = self.exists(dirname)
-		if not folder:
-			logging.error("Folder doesn't exist, you need to mkdir '%s' beforehand" % dirname)
+		if not folder and folder_id is None:
+			logging.error("Can't copy: Folder doesn't exist, you need to mkdir '%s' beforehand" % dirname)
 			return None
 		mime_type = mimetypes.types_map[os.path.splitext(filename)[-1]]
-		self.insert(source, title = filename, folder_id = folder['id'], mime_type = mime_type)
-
-	def stat(self, FileName, folder_id = None):
-		raise "WARNING not implemented GDrive stat " + FileName
-
+		if folder_id is None:
+			folder_id = folder['id']
+		self.insert(source, title = filename, folder_id = folder_id, mime_type = mime_type)
 
 	def wget(self, source, folder_id = None):
 		"""Download a file's and return its content.
@@ -406,14 +437,9 @@ class Drive:
 			if resp.status == 200:
 				logging.debug("wget Status: %s" % resp)
 				return content
-				# with open(target, 'a') as target_file:
-				# 	target_file.write(content)
 			else:
 				logging.error("An error occurred while downloading file '%s'" % resp)
 				return None
-
-	def getsize(self, FileName, folder_id = None):
-		raise "Not ready yet"
 
 	def remove(self, FileName, folder_id = None, file_id = None):
 		"""Remove a file.
@@ -442,5 +468,11 @@ class Drive:
 
 	def rmdir(self, DirName, folder_id = None):
 		raise "Not ready yet"
+
+	def getsize(self, FileName, folder_id = None):
+		raise "Not ready yet"
+
+	def stat(self, FileName, folder_id = None):
+		raise "WARNING not implemented GDrive stat " + FileName
 
 api = Drive(PICKLE_CLIENT_SECRET=PICKLE_CLIENT_SECRET)
