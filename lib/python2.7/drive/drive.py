@@ -132,18 +132,15 @@ class Drive:
 
 	def getCheckSumCache(self):
 		"""Fetch the checksumCache file and return the content or None is not found"""
-		content = self.wget("gdrive/"+"test.appcache")
-		# content = self.wget("gdrive/"+self.checksumCacheFileName)
+		content = self.wget("gdrive/"+self.checksumCacheFileName)
 		if content is not None:
 			try:
 				import cPickle as pickle
 			except:
 				import pickle
-			return 'ee'
+			return pickle.loads(content)
 		else:
 			return None
-
-
 
 	def oauth(self):
 		"""Create an authorized Drive API client service."""
