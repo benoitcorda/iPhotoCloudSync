@@ -104,6 +104,7 @@ class Drive:
 
 		if iPhoto_folder is not None:
 			self.rootDir = iPhoto_folder
+			self.checksumCache = self.getCheckSumCache()
 		else:
 			self.rootDir = self.mkdir(self.photoFolder)
 
@@ -128,6 +129,21 @@ class Drive:
 		logging.warning("Go to the following link in your browser: {0}".format(authorize_url))
 		code = raw_input('Enter verification code: ').strip()
 		self.credentials = flow.step2_exchange(code)
+
+	def getCheckSumCache(self):
+		"""Fetch the checksumCache file and return the content or None is not found"""
+		content = self.wget("gdrive/"+"test.appcache")
+		# content = self.wget("gdrive/"+self.checksumCacheFileName)
+		if content is not None:
+			try:
+				import cPickle as pickle
+			except:
+				import pickle
+			return 'ee'
+		else:
+			return None
+
+
 
 	def oauth(self):
 		"""Create an authorized Drive API client service."""
@@ -373,12 +389,11 @@ class Drive:
 		logging.error(u"stat not implement for Gdrive {0}".format(FileName))
 
 
-	def wget(self, source, target, folder_id = None):
-		"""Download a file's content into target file.
+	def wget(self, source, folder_id = None):
+		"""Download a file's and return its content.
 
 		Args:
 		source: absolute path in gdrive/ or relative with folder_id.
-		target: downloaded content output file.
 
 		Returns:
 		File's content if successful, None otherwise.
@@ -391,8 +406,9 @@ class Drive:
 			resp, content = self.service._http.request(download_url)
 			if resp.status == 200:
 				logging.debug("wget Status: %s" % resp)
-				with open(target, 'a') as target_file:
-					target_file.write(content)
+				return content
+				# with open(target, 'a') as target_file:
+				# 	target_file.write(content)
 			else:
 				logging.error("An error occurred while downloading file '%s'" % resp)
 				return None
@@ -400,8 +416,30 @@ class Drive:
 	def getsize(self, FileName, folder_id = None):
 		raise "Not ready yet"
 
-	def remove(self, FileName, folder_id = None):
-		raise "Not ready yet"
+	def remove(self, FileName, folder_id = None, file_id = None):
+		"""Remove a file.
+
+		Args:
+			FileName: path of the file to delete (absolute if folder_id not provided e.g. 'gdrive/foobar.txt').
+			folder_id: ID of the folder to remove the FileName (FileName is relative path).
+			file_id: ID of the file to remove from the folder, if file_id is provided the previous two are ignored.
+		"""
+		if folder_id is None:
+			folder_id = self.rootDir['id']
+		if file_id is None:
+			result = self.ls(FileName, folder_id = folder_id)
+			if len(result) == 1:
+				file_id = result[0].get('id')
+			if len(result) > 1:
+				logging.error("Ambigous results for deleting '%s', operation cancelled." % FileName)
+				return
+		if file_id is not None:
+			try:
+				self.service.files().delete(fileId=file_id).execute()
+			except errors.HttpError, error:
+				logging.error('An error occurred: %s' % error)
+		else:
+			logging.error("Can't remove  '%s' or '%s' reason:not found, operation cancelled." % (FileName, file_id))
 
 	def rmdir(self, DirName, folder_id = None):
 		raise "Not ready yet"
