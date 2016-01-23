@@ -170,7 +170,7 @@ class Drive:
 			if len(checksums) > 0:
 				nonemptyFolderCount +=1
 				mediaCount += len(checksums)
-				cache[path] = checksums
+			cache[path] = checksums
 		logging.debug("Found %d empty folders %d folders with medias, with %d files total" %(emptyFolderCount, nonemptyFolderCount, mediaCount))
 		logging.debug("Checksumcache rebuilt uploading...")
 		self.updateCheckSumCache(cache)
@@ -287,7 +287,7 @@ class Drive:
 			if len(result) > 0:
 				dirID = result[0].get('id')
 			else:
-				logging.error('Path not found while trying to run ls for: %s' % path)
+				logging.warning('Path not found while trying to run ls for: %s' % path)
 				return []
 		return self._ls(listOfDirs.pop(0), folder_id = dirID)
 
