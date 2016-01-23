@@ -144,6 +144,37 @@ class Drive:
 		else:
 			return None
 
+	def rebuildCheckSumCache(self):
+		"""List all the files under iPhoto folder on Gdrive and store checksums into cache.
+		Cache file will be uploaded on GDrive
+		"""
+		queue = [(self.rootDir, self.prefix)]
+		cache = {}
+		logging.debug("Rebuilding checksumcache...")
+		emptyFolderCount = 0
+		nonemptyFolderCount = 0
+		mediaCount = 0
+		while len(queue) > 0:
+			curDir, path = queue.pop(0)
+			curFid = curDir['id']
+			results = self._ls('*', folder_id = curFid)
+			if len(results) == 0:
+				emptyFolderCount +=1
+			logging.debug('%s found %d elements' % (path, len(results)))
+			checksums = {}
+			for elm in results:
+				if elm['mimeType'] == 'application/vnd.google-apps.folder':
+					queue.append((elm, os.path.join(path,elm['title'])))
+				elif 'image' in elm['mimeType'] or 'video' in elm['mimeType']:
+					checksums[elm['title']] = elm['md5Checksum']
+			if len(checksums) > 0:
+				nonemptyFolderCount +=1
+				mediaCount += len(checksums)
+				cache[path] = checksums
+		logging.debug("Found %d empty folders %d folders with medias, with %d files total" %(emptyFolderCount, nonemptyFolderCount, mediaCount))
+		logging.debug("Checksumcache rebuilt uploading...")
+		self.updateCheckSumCache(cache)
+
 	def updateCheckSumCache(self, new_cache = None):
 		"""Update the checksumCacheFileName the checksumCache file
 
@@ -159,6 +190,9 @@ class Drive:
 		if new_cache is None:
 			new_cache = self.checksumCache
 		else:
+			if type(new_cache) != dict:
+				logging.error("updateCheckSumCache error: you must provide a valid dictionary")
+				return
 			self.checksumCache = new_cache
 		if new_cache is None:
 			logging.warning("Can't updateCheckSumCache no content provided/found please provide 'new_cache' argument")
@@ -236,7 +270,10 @@ class Drive:
 
 		result = []
 		page_token = None
-		gpath = path[len(self.prefix)-1:] # remove prefix without ending slash
+		if path.startswith(self.prefix):
+			gpath = path[len(self.prefix)-1:] # remove prefix without ending slash
+		else:
+			gpath = path
 		listOfDirs = [i for i in gpath.split(os.sep) if len(i) > 0]
 		dirID = folder_id or self.rootDir['id']
 		if len(listOfDirs) == 0:
@@ -346,7 +383,10 @@ class Drive:
 		if folder_id is None:
 			folder_id = self.rootDir['id']
 
-		gDirName = DirName[len(self.prefix)-1:] # remove prefix without ending slash
+		if DirName.startswith(self.prefix):
+			gDirName = DirName[len(self.prefix)-1:] # remove prefix without ending slash
+		else:
+			gDirName = DirName
 		listOfDirs = [i for i in gDirName.split(os.sep) if len(i) > 0]
 		while len(listOfDirs) > 0:
 			newDir = listOfDirs.pop(0)
