@@ -17,7 +17,7 @@
 
 import getpass
 import logging
-#import os
+import os
 import re
 import sys
 import time
@@ -59,11 +59,9 @@ def md5(full_path):
 
 # File operations intercepts
 def join(*arg):
-    import os.path
     return os.path.join(*arg)
 
 def exists(path, options):
-    import os.path
     if options.drive and path.startswith('gdrive/'):
         if path == 'gdrive/':
             return True
@@ -73,7 +71,6 @@ def exists(path, options):
         return os.path.exists(path)
 
 def isdir(s, options):
-    import os.path
     if s.startswith('gdrive/'):
         path, folder = os.path.split(s)
         _, ext = os.path.splitext(folder)
@@ -101,9 +98,6 @@ def rmdir(path, options):
         return os.rmdir(path)
 
 def remove(path, options):
-    import os
-    print 'remove',path
-    raise "not ready yet check this"
     if options.drive:
         return GDrive.api.remove(path)
     else:
@@ -122,7 +116,6 @@ def getmtime(filename, options):
     if filename.startswith('gdrive/'):
         raise  "Not Implemented for GDrive, you shouldn't need this"
     else:
-        import os.path
         return os.path.getmtime(filename)
 
 def getsize(filename, options):
@@ -131,11 +124,9 @@ def getsize(filename, options):
     if options.drive:
         return GDrive.api.getsize(filename)
     else:
-        import os.path
         return os.path.getsize(filename)
 
 def split(p):
-    import os.path
     return os.path.split(p)
 
 def mkdir(path, options, mode=0777):
@@ -225,6 +216,11 @@ class ExportFile(object):
                 su.getfileextension(photo.originalpath))
         else:
             self.original_export_file = None
+
+    def __str__(self):
+        return ' '.join((self.photo.image_path, '->', self.export_file))
+
+    __repr__ = __str__
 
     def get_photo(self):
         """Gets the associated iPhotoImage."""
@@ -590,12 +586,42 @@ class ExportDirectory(object):
 
     def load_album(self, options):
         """walks the album directory tree, and scans it for existing files."""
+        # if we're using gdrive use the checksum cached file
+        if options.drive and self.albumdirectory.startswith('gdrive/'):
+            # Checkchecksum cache if it exist
+            if GDrive.api.checksumCache is None:
+                GDrive.api.rebuildCheckSumCache()
+            if GDrive.api.checksumCache.get(self.albumdirectory, None) is None:
+                su.pout("Creating folder " + self.albumdirectory)
+                if not options.dryrun:
+                    makedirs(self.albumdirectory)
+                else:
+                    return
+
+            _logger.info(u'Checking "%s"', self.albumdirectory)
+            for _, f in self.files.iteritems():
+                exportFile = f.export_file
+                originalFile = f.photo.image_path
+                fileDir, fileName = split(exportFile)
+                checksum = GDrive.api.checksumCache.get(fileDir, {}).get(fileName)
+                if checksum:
+                    import hashlib
+                    original_checksum = hashlib.md5(open(originalFile).read()).hexdigest()
+                    if checksum != original_checksum:
+                        print 'Checksum missmatch deleting drive:', checksum, 'local:', original_checksum
+                        _logger.info(u'Checksum missmatch deleting "%s"', f.export_file)
+                        delete_album_file(f.export_file, GDrive.api.prefix,
+                                  "Obsolete exported file", options)
+            # delete_album_file
+            return
+
         if not exists(self.albumdirectory, options):
             su.pout("Creating folder " + self.albumdirectory)
             if not options.dryrun:
                 makedirs(self.albumdirectory)
             else:
                 return
+
         file_list = listdir(self.albumdirectory, options)
         if file_list is None:
             return
