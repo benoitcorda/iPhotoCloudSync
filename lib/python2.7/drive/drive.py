@@ -465,7 +465,14 @@ class Drive:
 		mime_type = mimetypes.types_map[os.path.splitext(filename)[-1]]
 		if folder_id is None:
 			folder_id = folder['id']
-		self.insert(source, title = filename, folder_id = folder_id, mime_type = mime_type)
+
+		newFile = self.insert(source, title = filename, folder_id = folder_id, mime_type = mime_type)
+
+		if newFile is not None:
+			dirCache = self.getCheckSumCache().get(dirname,{})
+			dirCache[newFile['title']] = newFile['md5Checksum']
+			self._checksumcache[dirname] = dirCache
+
 
 	def wget(self, source, folder_id = None):
 		"""Download a file's and return its content.
@@ -509,6 +516,11 @@ class Drive:
 		if file_id is not None:
 			try:
 				self.service.files().delete(fileId=file_id).execute()
+				filename = os.path.basename(FileName)
+				dirname =  os.path.dirname(FileName)
+				dirCache = self.getCheckSumCache().get(dirname,{})
+				if dirCache:
+					dirCache.pop(filename, None)
 			except errors.HttpError, error:
 				logging.error('An error occurred: %s' % error)
 		else:
