@@ -40,7 +40,7 @@ CLIENT_SECRET_FILE = os.path.join(CUR_DIR,'client_secrets.json')
 PICKLE_CLIENT_SECRET = os.path.join(CUR_DIR,'credentials.pkl')
 
 
-logging.basicConfig(level = logging.WARNING,
+logging.basicConfig(stream=sys.stdout, level = logging.WARNING,
 					format = '%(asctime)s - %(filename)s %(lineno)d - %(levelname)s - %(message)s')
 
 # from https://docs.python.org/2/howto/logging-cookbook.html
@@ -81,6 +81,7 @@ class Drive:
 			PICKLE_CLIENT_SECRET: file path where the credentials are picled.
 			CLIENT_SECRET_FILE: secret data file to request credentials with.
 		"""
+		self._checksumcache = None
 		try:
 			if (not os.path.isfile(PICKLE_CLIENT_SECRET)):
 				raise FileNotFoundError("No Auth Token")
@@ -106,7 +107,6 @@ class Drive:
 
 		if iPhoto_folder is not None:
 			self.rootDir = iPhoto_folder
-			self.checksumCache = self.getCheckSumCache()
 		else:
 			self.rootDir = self.mkdir(self.photoFolder)
 
@@ -133,16 +133,24 @@ class Drive:
 		self.credentials = flow.step2_exchange(code)
 
 	def getCheckSumCache(self):
-		"""Fetch the checksumCache file and return the content or None is not found"""
+		"""Fetch the checksumCache file and return the content or empty dictionary is not found"""
+		if self._checksumcache is not None:
+			return self._checksumcache
 		content = self.wget(self.checksumCacheFileName)
 		if content is not None:
 			try:
 				import cPickle as pickle
 			except:
 				import pickle
-			return pickle.loads(content)
-		else:
-			return None
+			try:
+				self._checksumcache = pickle.loads(content)
+			except Exception, e:
+				logging.error("Couldn't fetch checksumcache, error: {0}".format(e))
+
+		if not self._checksumcache:
+			self.rebuildCheckSumCache()
+
+		return self._checksumcache or {}
 
 	def rebuildCheckSumCache(self):
 		"""List all the files under iPhoto folder on Gdrive and store checksums into cache.
@@ -188,17 +196,17 @@ class Drive:
 			import pickle
 		import tempfile
 		if new_cache is None:
-			new_cache = self.checksumCache
+			new_cache = self.getCheckSumCache()
 		else:
 			if type(new_cache) != dict:
 				logging.error("updateCheckSumCache error: you must provide a valid dictionary")
 				return
-			self.checksumCache = new_cache
+			self._checksumCache = new_cache
 		if new_cache is None:
 			logging.warning("Can't updateCheckSumCache no content provided/found please provide 'new_cache' argument")
 			return
 
-		filename = '/tmp/checksumcache.%s' % os.getpid()
+		filename = '/tmp/_checksumcache.%s' % os.getpid()
 		temp = open(filename, 'w+b')
 		try:
 			pickle.dump(new_cache, temp, pickle.HIGHEST_PROTOCOL)
