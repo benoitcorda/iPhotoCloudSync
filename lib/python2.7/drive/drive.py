@@ -38,6 +38,8 @@ CUR_DIR = os.path.dirname(os.path.realpath(__file__))
 CLIENT_SECRET_FILE = os.path.join(CUR_DIR,'client_secrets.json')
 # pickled secret data (it's tedious)
 PICKLE_CLIENT_SECRET = os.path.join(CUR_DIR,'credentials.pkl')
+# pickled secret data (it's tedious)
+CACHE_FILE = os.path.join(CUR_DIR,'cache.pkl')
 
 
 logging.basicConfig(stream=sys.stdout, level = logging.WARNING,
@@ -132,24 +134,28 @@ class Drive:
 		code = raw_input('Enter verification code: ').strip()
 		self.credentials = flow.step2_exchange(code)
 
+	def fetchCheckSumCache(self):
+		"""Download and parse the checksumCacheFile from GDrive"""
+		content = self.wget(self.checksumCacheFileName)
+		try:
+			import cPickle as pickle
+		except:
+			import pickle
+		try:
+			return pickle.loads(content)
+		except Exception as e:
+			logging.error("Couldn't fetch checksumcache, error: %s" % e)
+			import traceback
+			logging.error(traceback.format_exc())
+			return None
+
 	def getCheckSumCache(self):
 		"""Fetch the checksumCache file and return the content or empty dictionary is not found"""
 		if self._checksumcache is not None:
 			return self._checksumcache
-		content = self.wget(self.checksumCacheFileName)
-		if content is not None:
-			try:
-				import cPickle as pickle
-			except:
-				import pickle
-			try:
-				self._checksumcache = pickle.loads(content)
-			except Exception, e:
-				logging.error("Couldn't fetch checksumcache, error: {0}".format(e))
-
+		self._checksumcache = self.fetchCheckSumCache()
 		if not self._checksumcache:
 			self.rebuildCheckSumCache()
-
 		return self._checksumcache or {}
 
 	def rebuildCheckSumCache(self):
@@ -158,7 +164,7 @@ class Drive:
 		"""
 		queue = [(self.rootDir, self.prefix)]
 		cache = {}
-		logging.debug("Rebuilding checksumcache...")
+		logging.warning("Rebuilding checksumcache...")
 		emptyFolderCount = 0
 		nonemptyFolderCount = 0
 		mediaCount = 0
@@ -178,10 +184,11 @@ class Drive:
 			if len(checksums) > 0:
 				nonemptyFolderCount +=1
 				mediaCount += len(checksums)
-			cache[path] = checksums
+				cache[path] = checksums
 		logging.debug("Found %d empty folders %d folders with medias, with %d files total" %(emptyFolderCount, nonemptyFolderCount, mediaCount))
 		logging.debug("Checksumcache rebuilt uploading...")
-		self.updateCheckSumCache(cache)
+		self._checksumcache = cache
+		self.updateCheckSumCache()
 
 	def updateCheckSumCache(self, new_cache = None):
 		"""Update the checksumCacheFileName the checksumCache file
@@ -194,30 +201,32 @@ class Drive:
 			import cPickle as pickle
 		except:
 			import pickle
-		import tempfile
 		if new_cache is None:
 			new_cache = self.getCheckSumCache()
 		else:
 			if type(new_cache) != dict:
 				logging.error("updateCheckSumCache error: you must provide a valid dictionary")
 				return
-			self._checksumCache = new_cache
+			self._checksumcache = new_cache
 		if new_cache is None:
 			logging.warning("Can't updateCheckSumCache no content provided/found please provide 'new_cache' argument")
 			return
-
-		filename = '/tmp/_checksumcache.%s' % os.getpid()
-		temp = open(filename, 'w+b')
 		try:
-			pickle.dump(new_cache, temp, pickle.HIGHEST_PROTOCOL)
-			temp.close()
+			with open(CACHE_FILE, 'wb') as handle:
+				pickle.dump(new_cache, handle, pickle.HIGHEST_PROTOCOL)
 			# remove old one.
-			if self.exists(self.checksumCacheFileName):
+			if self.exists(self.checksumCacheFileName) and os.path.exists(CACHE_FILE):
 				self.remove(self.checksumCacheFileName)
 			# upload to gdrive.
-			self.copy2(filename, self.checksumCacheFileName)
+			self.copy2(CACHE_FILE, self.checksumCacheFileName)
 		finally:
-			os.remove(filename)
+			if os.path.exists(CACHE_FILE):
+				os.remove(CACHE_FILE)
+				logging.debug("removed %s" % CACHE_FILE)
+		# try to fetch is from GDrive, just to be safe
+		if self.fetchCheckSumCache() is None:
+			logging.error("updateCheckSumCache failed, retrying...")
+			self.updateCheckSumCache(new_cache = new_cache)
 
 	def oauth(self):
 		"""Create an authorized Drive API client service."""
@@ -322,7 +331,7 @@ class Drive:
 			return result[0]
 		else:
 			fileList = [i['title'] for i in result]
-			logging.error('Exists call got more than one result: %s, returning first' % fileList)
+			logging.error("Exists call '%s' got more than one result: %s, returning first" % (Name, fileList))
 			return result[0]
 
 	def listdir(self, path, folder_id = None):
