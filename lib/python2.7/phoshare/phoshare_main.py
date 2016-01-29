@@ -394,9 +394,9 @@ class ExportFile(object):
             if (options.originals and self.photo.originalpath and
                 not self.photo.rotation_is_only_edit):
                 self._generate_original(options)
-        except (OSError, MacOS.Error) as ose:
+        except Exception as e:
             su.perr(u"Failed to export %s to %s: %s" % (self.photo.image_path, self.export_file,
-                                                        ose))
+                                                        e))
 
     def get_export_keywords(self, do_face_keywords):
         """Returns the list of keywords that should be in the exported image."""
@@ -589,24 +589,24 @@ class ExportDirectory(object):
         # if we're using gdrive use the checksum cached file
         if options.drive and self.albumdirectory.startswith('gdrive/'):
             # Checkchecksum cache if it exist
-            if GDrive.api.checksumCache is None:
-                GDrive.api.rebuildCheckSumCache()
-            if GDrive.api.checksumCache.get(self.albumdirectory, None) is None:
+            if GDrive.api.getCheckSumCache().get(self.albumdirectory) is None:
                 su.pout("Creating folder " + self.albumdirectory)
                 if not options.dryrun:
                     makedirs(self.albumdirectory)
-                else:
-                    return
+            else:
+                su.pout("Folder '" + self.albumdirectory + "' already exists.")
 
+            return
+
+            # we do need to check checksum match here since we do it in _check_need_to_export
             _logger.info(u'Checking "%s"', self.albumdirectory)
             for _, f in self.files.iteritems():
                 exportFile = f.export_file
                 originalFile = f.photo.image_path
                 fileDir, fileName = split(exportFile)
-                checksum = GDrive.api.checksumCache.get(fileDir, {}).get(fileName)
+                checksum = GDrive.api.getCheckSumCache().get(fileDir, {}).get(fileName)
                 if checksum:
-                    import hashlib
-                    original_checksum = hashlib.md5(open(originalFile).read()).hexdigest()
+                    original_checksum = md5(originalFile)
                     if checksum != original_checksum:
                         print 'Checksum missmatch deleting drive:', checksum, 'local:', original_checksum
                         _logger.info(u'Checksum missmatch deleting "%s"', f.export_file)
@@ -835,8 +835,9 @@ class ExportLibrary(object):
             album_directories[folder.albumdirectory] = True
             folder.load_album(options)
 
-        self.check_directories(self.albumdirectory, "", album_directories,
-                               options)
+        if not options.drive:
+            self.check_directories(self.albumdirectory, "", album_directories,
+                                   options)
 
     def check_directories(self, directory, rel_path, album_directories,
                           options):
@@ -914,6 +915,10 @@ def export_iphoto(library, data, excludes, options):
 
     print "Exporting photos from iPhoto to export folder..."
     library.generate_files(options)
+
+    if options.drive and GDrive.api.getCheckSumCache():
+        print "Uploading checksumcache to GDrive..."
+        GDrive.api.updateCheckSumCache()
 
 USAGE = """usage: %prog [options]
 Exports images and movies from an iPhoto library into a folder.
@@ -1040,7 +1045,7 @@ def get_option_parser():
         "-x", "--exclude",
         help="""Don't export matching albums or events. The pattern is a
         regular expression.""")
-    p.add_option('--verbose', action='store_true',
+    p.add_option('-v', '--verbose', action='store_true',
                  help='Print verbose messages.')
     p.add_option('--version', action='store_true',
                  help='Print build version and exit.')
